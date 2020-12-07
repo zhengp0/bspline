@@ -3,7 +3,8 @@ Test SplineBasis Class
 """
 import pytest
 import numpy as np
-from xspline.basis import SplineBasis, SplineSpecs
+from xspline.interval import Interval
+from xspline.basis import SplineBasis, SplineSpecs, get_spline_bases
 
 knots = [0.0, 0.5, 1.0]
 degree = 1
@@ -130,3 +131,48 @@ def test_spline_specs_check_degree(knots, degree):
 def test_spline_specs(knots, degree):
     specs = SplineSpecs(knots, degree)
     assert specs.num_bases == degree + 2
+
+
+@pytest.mark.parametrize("knots", [[0, 1, 2]])
+@pytest.mark.parametrize("degree", [0])
+@pytest.mark.parametrize("index", [-1, 2, 3, 4])
+def test_spline_specs_index_check(knots, degree, index):
+    with pytest.raises(AssertionError):
+        SplineSpecs(knots, degree, index)
+
+
+@pytest.mark.parametrize("knots", [[0, 1, 2]])
+@pytest.mark.parametrize("degree", [0])
+@pytest.mark.parametrize("index", [0, 1])
+def test_spline_specs_index(knots, degree, index):
+    specs = SplineSpecs(knots, degree, index)
+    assert specs.index == index
+    assert isinstance(specs.domain, Interval)
+    assert isinstance(specs.support, Interval)
+    specs.index = None
+    assert specs.index is None
+    assert specs.domain is None
+    assert specs.support is None
+
+
+@pytest.mark.parametrize("knots", [[0, 1, 2]])
+@pytest.mark.parametrize("degree", [0])
+@pytest.mark.parametrize("index", [0, 1])
+@pytest.mark.parametrize("with_index", [True, False])
+def test_spline_specs_copy(knots, degree, index, with_index):
+    specs = SplineSpecs(knots, degree, index)
+    specs_copy = specs.copy(with_index=with_index)
+    assert np.allclose(specs.knots, specs_copy.knots)
+    assert specs.degree == specs_copy.degree
+    if with_index:
+        assert specs.index == specs_copy.index
+    else:
+        assert specs_copy.index is None
+
+
+@pytest.mark.parametrize("specs", [SplineSpecs([0.0, 0.5, 1.0], 3)])
+def test_get_spline_bases(specs):
+    bases = get_spline_bases(specs)
+    assert len(bases) == specs.degree + 1
+    assert all([all([basis.is_linked() for basis in bases[d]])
+                for d in range(len(bases))])
