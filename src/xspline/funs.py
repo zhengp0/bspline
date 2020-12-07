@@ -43,6 +43,13 @@ class PolyFunction(FullFunction):
 
     def __post_init__(self):
         self.coefs = np.asarray(self.coefs)
+        self.coefs = np.trim_zeros(np.asarray(self.coefs), trim="b")
+        if self.coefs.size == 0:
+            self.coefs = np.zeros(1)
+        if self.coefs.size == 1:
+            self.fun = ConstFunction(const=self.coefs[0],
+                                     domain=self.domain,
+                                     support=self.support)
 
     @property
     def degree(self) -> int:
@@ -60,6 +67,8 @@ class PolyFunction(FullFunction):
         return cls(**kwargs)
 
     def __call__(self, data: Iterable, order: int = 0) -> np.ndarray:
+        if self.fun is not None:
+            return self.fun(data, order)
         data, order = check_fun_input(data, order)
         if order == 0:
             val = np.polyval(self.coefs[::-1], data[-1])
