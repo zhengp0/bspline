@@ -3,6 +3,7 @@ Core Module
 """
 from collections.abc import Iterable
 from dataclasses import dataclass, field
+from operator import le, lt
 from typing import Callable, Union
 
 import numpy as np
@@ -28,14 +29,15 @@ class FullFunction:
 
         def fun(data: Iterable, order: int = 0) -> np.ndarray:
             data, order = check_fun_input(data, order)
-            lx1 = data[-1] <= self.domain.ub
+            lopt = le if self.domain.ub.cld else lt
+            lx1 = lopt(data[-1], self.domain.ub.val)
             rx1 = ~lx1
             val = np.zeros(data.shape[-1])
             if order >= 0:
                 val[lx1] = self(data[:, lx1], order)
                 val[rx1] = rfun(data[:, rx1], order)
             else:
-                lx0 = data[0] <= self.domain.ub
+                lx0 = lopt(data[0], self.domain.ub.val)
                 rx0 = ~lx0
                 lboth = lx0 & lx1
                 rboth = rx0 & rx1
