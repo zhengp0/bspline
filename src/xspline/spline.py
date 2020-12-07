@@ -35,7 +35,7 @@ class XSpline:
         funs = []
         for basis in self.bases[-1]:
             for i, xorder in enumerate(self.xorders):
-                if basis.domain[i] == self.domain[i]:
+                if basis.domain[i] == self.domain[i] and xorder < self.specs.degree:
                     fun_vals = [basis([self.domain[i]], order)[0]
                                 for order in range(xorder + 1)]
                     xfun = PolyFunction.from_taylor(self.domain[i], fun_vals, domain=xdomains[i])
