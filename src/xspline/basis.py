@@ -1,7 +1,6 @@
 """
 Spline Basis Module
 """
-from dataclasses import dataclass, field
 from operator import xor
 from typing import Iterable, List, Tuple, Union
 
@@ -124,13 +123,14 @@ class SplineSpecs:
 
     def __repr__(self) -> str:
         if self.index is None:
-            return f"Spline(knots={self.knots}, degree={self.degree})"
+            output = f"Spline(knots={self.knots}, degree={self.degree})"
         else:
-            return (f"Spline(knots={self.knots}, "
-                    f"degree={self.degree}, "
-                    f"index={self.index}, "
-                    f"domain={self.domain}, "
-                    f"support={self.support})")
+            output = (f"Spline(knots={self.knots}, "
+                      f"degree={self.degree}, "
+                      f"index={self.index}, "
+                      f"domain={self.domain}, "
+                      f"support={self.support})")
+        return output
 
 
 class SplineBasis(FullFunction):
@@ -147,6 +147,9 @@ class SplineBasis(FullFunction):
         self.links = [None, None] if links is None else links
         kwargs.update({"domain": self.specs.domain, "support": self.specs.support})
         super().__init__(**kwargs)
+
+        self._data = np.empty((1, 0))
+        self._values = {}
 
     def link_basis(self, basis: "SplineBasis"):
         assert isinstance(basis, SplineBasis)
@@ -165,21 +168,36 @@ class SplineBasis(FullFunction):
         links = [basis is not None for basis in self.links]
         return self.specs.degree == 0 or all([xor(*p) for p in zip(edges, links)])
 
+    def has_data(self, data: np.ndarray) -> bool:
+        return self._data.shape == data.shape and np.allclose(self._data, data)
+
+    def attach_data(self, data: np.ndarray):
+        if not self.has_data(data):
+            self.detach_data()
+            self._data = data
+
+    def detach_data(self):
+        self._data = np.empty((1, 0))
+        self._values = {}
+
     def __call__(self, data: Iterable, order: int = 0) -> np.ndarray:
         assert self.is_linked()
         data, order = check_fun_input(data, order)
-        if self.specs.degree == 0:
-            val = IndicatorFunction(domain=self.support)(data, order)
-        else:
-            val = np.zeros(data.shape[-1])
-            for i, basis in enumerate(self.links):
-                if basis is None:
-                    continue
-                lag_fun = PolyFunction.from_lagrange(list(basis.domain), [i, 1 - i])
-                val += basis(data, order)*lag_fun(data)
-                if order != 0:
-                    val += order*basis(data, order - 1)*lag_fun(data, 1)
-        return val
+        self.attach_data(data)
+        if order not in self._values:
+            if self.specs.degree == 0:
+                val = IndicatorFunction(domain=self.support)(data, order)
+            else:
+                val = np.zeros(data.shape[-1])
+                for i, basis in enumerate(self.links):
+                    if basis is None:
+                        continue
+                    lag_fun = PolyFunction.from_lagrange(list(basis.domain), [i, 1 - i])
+                    val += basis(data, order)*lag_fun(data)
+                    if order != 0:
+                        val += order*basis(data, order - 1)*lag_fun(data, 1)
+            self._values[order] = val
+        return self._values[order]
 
     def __repr__(self) -> str:
         return self.specs.__str__()
